@@ -26,6 +26,8 @@ REPO_ROOT = Path(__file__).parent
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 CREDS_FILE = REPO_ROOT / "credentials.json"
 TOKEN_FILE = REPO_ROOT / "token.json"
+GITHUB_REPO = "https://github.com/RitweekS/DSA"
+GITHUB_BRANCH = "main"
 
 # Columns: S.NO | CONCEPTS | DIFFICULTY | QUESTIONS | LINK | SOLUTION
 HEADER = ["S.NO", "CONCEPTS", "DIFFICULTY", "QUESTIONS", "LINK", "SOLUTION"]
@@ -74,14 +76,18 @@ def parse_ts_file(filepath: Path) -> dict | None:
         link = f"https://www.geeksforgeeks.org/problems/{slug}/"
 
     # Concept: top-level folder, with sorting subfolder flattened
-    parts = filepath.relative_to(REPO_ROOT).parts
+    relative_path = filepath.relative_to(REPO_ROOT)
+    parts = relative_path.parts
     concept = parts[0].replace("-", " ").title()  # e.g. "Binary Search", "Array", "Sorting"
+
+    github_url = f"{GITHUB_REPO}/blob/{GITHUB_BRANCH}/{relative_path.as_posix()}"
 
     return {
         "concept": concept,
         "difficulty": difficulty,
         "question": problem_name,
         "link": link,
+        "github_url": github_url,
     }
 
 
@@ -130,9 +136,7 @@ def get_next_sno(service) -> int:
 
 
 def sync(problems: list[dict], service):
-    existing = get_existing_questions(service)
-
-    # Check current sheet state
+    # Read full sheet to check existing questions and their solution cells
     result = (
         service.spreadsheets()
         .values()
@@ -142,31 +146,59 @@ def sync(problems: list[dict], service):
     all_rows = result.get("values", [])
     ensure_header(service, all_rows)
 
+    # Build a map: question name (lowercase) → sheet row index (1-based)
+    question_to_row = {}
+    for i, row in enumerate(all_rows):
+        if len(row) >= 4 and row[3].strip():
+            question_to_row[row[3].strip().lower()] = i + 1  # 1-based row number
+
+    # Build a map of questions with an empty SOLUTION column (column F)
+    missing_solution = {}
+    for i, row in enumerate(all_rows):
+        if len(row) >= 4 and row[3].strip():
+            solution_val = row[5].strip() if len(row) >= 6 else ""
+            if not solution_val:
+                missing_solution[row[3].strip().lower()] = i + 1
+
+    # Build lookup: question name → github_url
+    problem_map = {p["question"].lower(): p for p in problems}
+
     new_rows = []
-    skipped = 0
+    updated = 0
     sno = get_next_sno(service)
 
+    # Update SOLUTION for existing rows that are missing it
+    for q_lower, sheet_row in missing_solution.items():
+        if q_lower in problem_map:
+            cell = f"{SHEET_TAB}!F{sheet_row}"
+            service.spreadsheets().values().update(
+                spreadsheetId=SHEET_ID,
+                range=cell,
+                valueInputOption="USER_ENTERED",
+                body={"values": [[problem_map[q_lower]["github_url"]]]},
+            ).execute()
+            updated += 1
+
+    # Append new problems not yet in the sheet
+    existing = set(question_to_row.keys())
     for p in problems:
         if p["question"].lower() in existing:
-            skipped += 1
             continue
-        # SOLUTION column is intentionally left blank
-        new_rows.append([sno, p["concept"], p["difficulty"], p["question"], p["link"], ""])
+        new_rows.append([sno, p["concept"], p["difficulty"], p["question"], p["link"], p["github_url"]])
         sno += 1
 
-    if not new_rows:
-        print(f"Nothing new to add. {skipped} problem(s) already in sheet.")
-        return
+    if new_rows:
+        service.spreadsheets().values().append(
+            spreadsheetId=SHEET_ID,
+            range=f"{SHEET_TAB}!A:F",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": new_rows},
+        ).execute()
 
-    service.spreadsheets().values().append(
-        spreadsheetId=SHEET_ID,
-        range=f"{SHEET_TAB}!A:F",
-        valueInputOption="USER_ENTERED",
-        insertDataOption="INSERT_ROWS",
-        body={"values": new_rows},
-    ).execute()
-
-    print(f"Added {len(new_rows)} new problem(s). Skipped {skipped} already existing.")
+    print(f"Added {len(new_rows)} new problem(s). Updated {updated} solution link(s).")
+    if not new_rows and not updated:
+        print("Sheet is already up to date.")
 
 
 def main():
