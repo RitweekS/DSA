@@ -14,3 +14,4 @@ __pycache__/
 
 # Node (if added later)
 node_modules/
+python-exq.py
