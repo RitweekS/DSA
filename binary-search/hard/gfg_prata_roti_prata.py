@@ -1,3 +1,20 @@
+"""
+Problem: Roti Prata (Prata / Chapati Cooking Problem)
+Difficulty: Hard
+Source: https://www.interviewbit.com/problems/roti-prata/
+
+Description:
+Given the ranks of p cooks, where the i-th cook takes rank[i] minutes to cook the first
+prata, 2*rank[i] for the second, 3*rank[i] for the third, and so on, find the minimum
+time needed to cook at least target pratas in total using all cooks working in parallel.
+Binary search on the answer: for a candidate time mid, each cook greedily cooks as many
+pratas as fit within mid minutes; check whether the combined count across all cooks
+reaches target.
+
+Time Complexity: O(n * sqrt(time)) — for each candidate time, each cook's prata count is
+found by incrementing j until its cumulative cook time exceeds mid
+Space Complexity: O(1)
+"""
 
 def is_possible(nums,target,mid):
     prata_count = 0

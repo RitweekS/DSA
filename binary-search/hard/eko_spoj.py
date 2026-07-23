@@ -1,3 +1,18 @@
+"""
+Problem: EKO - Eko (Wood Cutting Machine)
+Difficulty: Hard
+Source: https://www.spoj.com/problems/EKO/
+
+Description:
+Given the heights of n trees and a required amount of wood m, find the maximum saw
+height h such that setting a cutting machine to h yields at least m units of wood, where
+each tree taller than h contributes (height - h) units and shorter trees contribute none.
+Binary search on the answer: search the range [0, max(trees)] for the largest height for
+which the total wood collected is still >= target.
+
+Time Complexity: O(n * log(max height)) — binary search * linear feasibility check per iteration
+Space Complexity: O(1)
+"""
 from typing import List
 
 def is_possible(trees:List[int],target:int,mid:int):

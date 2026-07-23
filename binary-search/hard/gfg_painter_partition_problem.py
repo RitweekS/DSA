@@ -1,3 +1,18 @@
+"""
+Problem: Painter's Partition Problem
+Difficulty: Hard
+Source: https://www.geeksforgeeks.org/painters-partition-problem/
+
+Description:
+Given an array of board lengths and k painters, split the boards into k contiguous
+partitions such that each painter paints one partition, and the maximum total length
+painted by any single painter is minimized.
+Binary search on the answer: search the range [max(nums), sum(nums)] for the smallest
+maximum partition length for which a valid split among k painters is feasible.
+
+Time Complexity: O(n * log(sum - max)) — binary search * linear feasibility check per iteration
+Space Complexity: O(1)
+"""
 from typing import List
 def is_possible(nums:List[int],k:int,limit:int)->bool:
     painter = 1
